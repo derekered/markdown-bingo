@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Markdown Bingo Generator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Markdown Bingo Generator</h1>
+      <p class="subtitle">Generate a markdown bingo card from your own entries.</p>
+
+      <form id="bingo-form" novalidate>
+        <label for="title">Card title</label>
+        <input id="title" name="title" type="text" placeholder="My Bingo Card" />
+
+        <div class="grid two-cols">
+          <div>
+            <label for="rows">Rows</label>
+            <input id="rows" name="rows" type="number" min="1" max="15" value="5" />
+          </div>
+          <div>
+            <label for="cols">Columns</label>
+            <input id="cols" name="cols" type="number" min="1" max="15" value="5" />
+          </div>
+        </div>
+
+        <label for="columnLabels">Column labels</label>
+        <input id="columnLabels" name="columnLabels" type="text" value="BINGO" />
+        <p class="help">Use a single word (e.g. BINGO) or comma-separated labels (e.g. Team,Focus,Learn,Ship,Win).</p>
+
+        <fieldset>
+          <legend>Free space</legend>
+          <label class="inline">
+            <input id="includeFreeSpace" name="includeFreeSpace" type="checkbox" checked />
+            Include free space
+          </label>
+
+          <label for="freeSpacePosition">Position</label>
+          <select id="freeSpacePosition" name="freeSpacePosition">
+            <option value="center" selected>Center</option>
+            <option value="top-left">Top left</option>
+            <option value="top-right">Top right</option>
+            <option value="bottom-left">Bottom left</option>
+            <option value="bottom-right">Bottom right</option>
+            <option value="custom">Custom</option>
+          </select>
+
+          <div class="grid two-cols" id="customPositionFields" hidden>
+            <div>
+              <label for="freeSpaceRow">Free space row (1-based)</label>
+              <input id="freeSpaceRow" name="freeSpaceRow" type="number" min="1" value="3" />
+            </div>
+            <div>
+              <label for="freeSpaceCol">Free space col (1-based)</label>
+              <input id="freeSpaceCol" name="freeSpaceCol" type="number" min="1" value="3" />
+            </div>
+          </div>
+        </fieldset>
+
+        <label for="entries">Possible cell contents</label>
+        <textarea
+          id="entries"
+          name="entries"
+          rows="10"
+          placeholder="One entry per line or comma-separated"
+        ></textarea>
+
+        <button type="submit">Generate</button>
+      </form>
+
+      <p id="error" class="error" role="alert"></p>
+
+      <section>
+        <h2>Markdown Output</h2>
+        <textarea id="output" rows="12" readonly></textarea>
+        <button id="copyButton" type="button">Copy Markdown</button>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
