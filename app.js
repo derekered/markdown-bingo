@@ -1,10 +1,34 @@
-const form = document.querySelector('#bingo-form');
+const titleInput = document.querySelector('#title');
+const entriesInput = document.querySelector('#entries');
+const boardEditor = document.querySelector('#boardEditor');
 const output = document.querySelector('#output');
-const errorEl = document.querySelector('#error');
 const copyButton = document.querySelector('#copyButton');
-const freeSpacePosition = document.querySelector('#freeSpacePosition');
-const customPositionFields = document.querySelector('#customPositionFields');
-const includeFreeSpace = document.querySelector('#includeFreeSpace');
+const shuffleButton = document.querySelector('#shuffleButton');
+const addRowButton = document.querySelector('#addRowButton');
+const removeRowButton = document.querySelector('#removeRowButton');
+const addColumnButton = document.querySelector('#addColumnButton');
+const removeColumnButton = document.querySelector('#removeColumnButton');
+const clearFreeSpaceButton = document.querySelector('#clearFreeSpaceButton');
+const dimensionStatus = document.querySelector('#dimensionStatus');
+const entryStatus = document.querySelector('#entryStatus');
+const feedbackEl = document.querySelector('#feedback');
+
+const DEFAULT_HEADERS = ['B', 'I', 'N', 'G', 'O'];
+const MIN_SIZE = 1;
+const MAX_SIZE = 15;
+
+const state = {
+  title: '',
+  entriesText: '',
+  rows: 5,
+  cols: 5,
+  headers: [...DEFAULT_HEADERS],
+  freeCell: { row: 2, col: 2 },
+  lastFreeCell: { row: 2, col: 2 },
+  board: [],
+  entryCount: 0,
+  requiredCount: 24,
+};
 
 function parseEntries(raw) {
   return Array.from(
@@ -26,133 +50,349 @@ function shuffle(array) {
   return values;
 }
 
-function buildHeaders(labelInput, cols) {
-  const trimmed = labelInput.trim();
-  if (!trimmed) {
-    return Array.from({ length: cols }, (_, idx) => `C${idx + 1}`);
-  }
-
-  if (trimmed.includes(',')) {
-    const labels = trimmed
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-    if (labels.length === cols) {
-      return labels;
-    }
-  }
-
-  if (trimmed.length === cols) {
-    return trimmed.split('');
-  }
-
-  return Array.from({ length: cols }, (_, idx) => `C${idx + 1}`);
+function getDefaultHeader(index) {
+  return DEFAULT_HEADERS[index] ?? `C${index + 1}`;
 }
 
-function getFreeSpaceLocation(position, rows, cols, customRow, customCol) {
-  switch (position) {
-    case 'top-left':
-      return [0, 0];
-    case 'top-right':
-      return [0, cols - 1];
-    case 'bottom-left':
-      return [rows - 1, 0];
-    case 'bottom-right':
-      return [rows - 1, cols - 1];
-    case 'custom':
-      return [customRow - 1, customCol - 1];
-    case 'center':
-    default:
-      return [Math.floor(rows / 2), Math.floor(cols / 2)];
+function normalizeHeaders() {
+  state.headers = Array.from({ length: state.cols }, (_, index) => state.headers[index] ?? getDefaultHeader(index));
+}
+
+function clampFreeCell() {
+  if (!state.freeCell) {
+    return;
   }
+
+  state.freeCell = {
+    row: Math.min(state.freeCell.row, state.rows - 1),
+    col: Math.min(state.freeCell.col, state.cols - 1),
+  };
+}
+
+function clampCell(cell) {
+  return {
+    row: Math.max(0, Math.min(cell.row, state.rows - 1)),
+    col: Math.max(0, Math.min(cell.col, state.cols - 1)),
+  };
+}
+
+function getDefaultFreeCell() {
+  return {
+    row: Math.floor(state.rows / 2),
+    col: Math.floor(state.cols / 2),
+  };
+}
+
+function getNextFreeCell() {
+  const candidate = state.lastFreeCell ?? getDefaultFreeCell();
+  return clampCell(candidate);
+}
+
+function getRequiredCount() {
+  return state.rows * state.cols - (state.freeCell ? 1 : 0);
+}
+
+function escapeMarkdownCell(value) {
+  return value.replaceAll('|', '\\|').replace(/\s+/g, ' ').trim();
 }
 
 function toMarkdown(title, headers, board) {
   const heading = title.trim() ? `# ${title.trim()}\n\n` : '';
-  const headerRow = `| ${headers.join(' | ')} |`;
-  const separator = `| ${headers.map(() => '---').join(' | ')} |`;
-  const bodyRows = board.map((row) => `| ${row.join(' | ')} |`).join('\n');
+  const safeHeaders = headers.map(escapeMarkdownCell);
+  const headerRow = `| ${safeHeaders.join(' | ')} |`;
+  const separator = `| ${safeHeaders.map(() => '---').join(' | ')} |`;
+  const bodyRows = board
+    .map((row) => `| ${row.map((cell) => escapeMarkdownCell(cell.label)).join(' | ')} |`)
+    .join('\n');
+
   return `${heading}${headerRow}\n${separator}\n${bodyRows}`;
 }
 
-function setError(message) {
-  errorEl.textContent = message;
+function setFeedback(message = '') {
+  feedbackEl.textContent = message;
 }
 
-function toggleCustomPosition() {
-  const show = includeFreeSpace.checked && freeSpacePosition.value === 'custom';
-  customPositionFields.hidden = !show;
-}
-
-freeSpacePosition.addEventListener('change', toggleCustomPosition);
-includeFreeSpace.addEventListener('change', toggleCustomPosition);
-toggleCustomPosition();
-
-form.addEventListener('submit', (event) => {
-  event.preventDefault();
-  setError('');
-
-  const formData = new FormData(form);
-  const title = formData.get('title')?.toString() ?? '';
-  const rows = Number(formData.get('rows'));
-  const cols = Number(formData.get('cols'));
-  const entriesRaw = formData.get('entries')?.toString() ?? '';
-  const labelsInput = formData.get('columnLabels')?.toString() ?? '';
-  const hasFreeSpace = formData.get('includeFreeSpace') === 'on';
-  const freePosition = formData.get('freeSpacePosition')?.toString() ?? 'center';
-  const customRow = Number(formData.get('freeSpaceRow'));
-  const customCol = Number(formData.get('freeSpaceCol'));
-
-  if (!Number.isInteger(rows) || !Number.isInteger(cols) || rows < 1 || cols < 1 || rows > 15 || cols > 15) {
-    setError('Rows and columns must be whole numbers from 1 to 15.');
-    return;
-  }
-
-  const entries = parseEntries(entriesRaw);
-  const required = rows * cols - (hasFreeSpace ? 1 : 0);
-  if (entries.length < required) {
-    setError(`Not enough unique entries. Need ${required}, got ${entries.length}.`);
-    return;
-  }
-
-  const headers = buildHeaders(labelsInput, cols);
-  const [freeRow, freeCol] = getFreeSpaceLocation(freePosition, rows, cols, customRow, customCol);
-
-  if (hasFreeSpace && (freeRow < 0 || freeRow >= rows || freeCol < 0 || freeCol >= cols)) {
-    setError('Free space location is outside the board.');
-    return;
-  }
-
-  const selected = shuffle(entries).slice(0, required);
-  const board = Array.from({ length: rows }, () => Array(cols).fill(''));
-
+function buildBoardPreview(selectedEntries) {
+  const board = [];
   let entryIndex = 0;
-  for (let r = 0; r < rows; r += 1) {
-    for (let c = 0; c < cols; c += 1) {
-      if (hasFreeSpace && r === freeRow && c === freeCol) {
-        board[r][c] = 'FREE SPACE';
-      } else {
-        board[r][c] = selected[entryIndex];
+  let placeholderIndex = 1;
+
+  for (let row = 0; row < state.rows; row += 1) {
+    const rowCells = [];
+
+    for (let col = 0; col < state.cols; col += 1) {
+      const isFree = state.freeCell && state.freeCell.row === row && state.freeCell.col === col;
+
+      if (isFree) {
+        rowCells.push({
+          label: 'FREE SPACE',
+          isFree: true,
+          isPlaceholder: false,
+        });
+        continue;
+      }
+
+      const label = selectedEntries[entryIndex] ?? `Entry ${placeholderIndex}`;
+      rowCells.push({
+        label,
+        isFree: false,
+        isPlaceholder: !selectedEntries[entryIndex],
+      });
+
+      if (selectedEntries[entryIndex]) {
         entryIndex += 1;
       }
+      placeholderIndex += 1;
+    }
+
+    board.push(rowCells);
+  }
+
+  return board;
+}
+
+function regenerateBoard() {
+  normalizeHeaders();
+  clampFreeCell();
+
+  const entries = parseEntries(state.entriesText);
+  state.entryCount = entries.length;
+  state.requiredCount = getRequiredCount();
+
+  const selectedEntries = shuffle(entries).slice(0, Math.min(entries.length, state.requiredCount));
+  state.board = buildBoardPreview(selectedEntries);
+}
+
+function renderBoard() {
+  boardEditor.innerHTML = '';
+  boardEditor.style.setProperty('--cols', String(state.cols));
+
+  const fragment = document.createDocumentFragment();
+
+  for (let col = 0; col < state.cols; col += 1) {
+    const headerWrap = document.createElement('div');
+    headerWrap.className = 'board-header';
+
+    const headerInput = document.createElement('input');
+    headerInput.type = 'text';
+    headerInput.value = state.headers[col];
+    headerInput.placeholder = getDefaultHeader(col);
+    headerInput.dataset.headerIndex = String(col);
+    headerInput.className = 'header-input';
+    headerInput.setAttribute('aria-label', `Column ${col + 1} header`);
+
+    headerWrap.append(headerInput);
+    fragment.append(headerWrap);
+  }
+
+  for (let row = 0; row < state.rows; row += 1) {
+    for (let col = 0; col < state.cols; col += 1) {
+      const cell = state.board[row][col];
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'board-cell';
+      button.dataset.row = String(row);
+      button.dataset.col = String(col);
+      button.setAttribute('aria-pressed', cell.isFree ? 'true' : 'false');
+      button.setAttribute(
+        'aria-label',
+        cell.isFree
+          ? `Free space at row ${row + 1}, column ${col + 1}. Click to remove it.`
+          : `${cell.label}. Cell at row ${row + 1}, column ${col + 1}. Click to set it as the free space.`
+      );
+
+      if (cell.isFree) {
+        button.classList.add('is-free');
+      }
+
+      if (cell.isPlaceholder) {
+        button.classList.add('is-placeholder');
+      }
+
+      if (cell.isFree) {
+        const freeLabel = document.createElement('span');
+        freeLabel.className = 'free-label';
+        freeLabel.textContent = 'FREE';
+        button.append(freeLabel);
+      } else {
+        const cellLabel = document.createElement('span');
+        cellLabel.className = 'cell-label';
+        cellLabel.textContent = cell.label;
+        button.append(cellLabel);
+      }
+
+      fragment.append(button);
     }
   }
 
-  output.value = toMarkdown(title, headers, board);
+  boardEditor.append(fragment);
+}
+
+function renderStatus() {
+  const missing = Math.max(0, state.requiredCount - state.entryCount);
+  dimensionStatus.textContent = `${state.rows} ${state.rows === 1 ? 'row' : 'rows'} x ${state.cols} ${state.cols === 1 ? 'column' : 'columns'}`;
+  entryStatus.textContent = `${state.entryCount} of ${state.requiredCount} unique entries${missing ? `, ${missing} more needed` : ''}`;
+
+  addRowButton.disabled = state.rows >= MAX_SIZE;
+  removeRowButton.disabled = state.rows <= MIN_SIZE;
+  addColumnButton.disabled = state.cols >= MAX_SIZE;
+  removeColumnButton.disabled = state.cols <= MIN_SIZE;
+  shuffleButton.disabled = state.entryCount === 0;
+}
+
+function renderOutput() {
+  const enoughEntries = state.entryCount >= state.requiredCount;
+
+  if (!enoughEntries) {
+    const missing = state.requiredCount - state.entryCount;
+    output.value = '';
+    output.placeholder = `Add ${missing} more unique ${missing === 1 ? 'entry' : 'entries'} to generate markdown.`;
+    copyButton.disabled = true;
+    return;
+  }
+
+  const headers = state.headers.map((header, index) => {
+    const trimmed = header.trim();
+    return trimmed || getDefaultHeader(index);
+  });
+
+  output.value = toMarkdown(state.title, headers, state.board);
+  copyButton.disabled = false;
+}
+
+function refresh() {
+  renderBoard();
+  renderStatus();
+  renderOutput();
+}
+
+function resizeBoard(nextRows, nextCols) {
+  state.rows = nextRows;
+  state.cols = nextCols;
+  normalizeHeaders();
+  clampFreeCell();
+  regenerateBoard();
+  refresh();
+}
+
+titleInput.addEventListener('input', () => {
+  state.title = titleInput.value;
+  renderOutput();
+});
+
+entriesInput.addEventListener('input', () => {
+  state.entriesText = entriesInput.value;
+  regenerateBoard();
+  refresh();
+  setFeedback('');
+});
+
+boardEditor.addEventListener('input', (event) => {
+  const headerInput = event.target.closest('[data-header-index]');
+  if (!headerInput) {
+    return;
+  }
+
+  const index = Number(headerInput.dataset.headerIndex);
+  state.headers[index] = headerInput.value;
+  renderOutput();
+});
+
+boardEditor.addEventListener('click', (event) => {
+  const cellButton = event.target.closest('[data-row][data-col]');
+  if (!cellButton) {
+    return;
+  }
+
+  const row = Number(cellButton.dataset.row);
+  const col = Number(cellButton.dataset.col);
+  const isSameCell = state.freeCell && state.freeCell.row === row && state.freeCell.col === col;
+
+  if (isSameCell) {
+    state.lastFreeCell = { row, col };
+    state.freeCell = null;
+  } else {
+    state.freeCell = { row, col };
+    state.lastFreeCell = { row, col };
+  }
+  regenerateBoard();
+  refresh();
+  setFeedback('');
+});
+
+addRowButton.addEventListener('click', () => {
+  if (state.rows >= MAX_SIZE) {
+    setFeedback('Board size is capped at 15 rows.');
+    return;
+  }
+
+  resizeBoard(state.rows + 1, state.cols);
+  setFeedback('');
+});
+
+removeRowButton.addEventListener('click', () => {
+  if (state.rows <= MIN_SIZE) {
+    setFeedback('The card must keep at least one row.');
+    return;
+  }
+
+  resizeBoard(state.rows - 1, state.cols);
+  setFeedback('');
+});
+
+addColumnButton.addEventListener('click', () => {
+  if (state.cols >= MAX_SIZE) {
+    setFeedback('Board size is capped at 15 columns.');
+    return;
+  }
+
+  resizeBoard(state.rows, state.cols + 1);
+  setFeedback('');
+});
+
+removeColumnButton.addEventListener('click', () => {
+  if (state.cols <= MIN_SIZE) {
+    setFeedback('The card must keep at least one column.');
+    return;
+  }
+
+  state.headers = state.headers.slice(0, state.cols - 1);
+  resizeBoard(state.rows, state.cols - 1);
+  setFeedback('');
+});
+
+clearFreeSpaceButton.addEventListener('click', () => {
+  if (state.freeCell) {
+    state.lastFreeCell = { ...state.freeCell };
+    state.freeCell = null;
+  } else {
+    state.freeCell = getNextFreeCell();
+    state.lastFreeCell = { ...state.freeCell };
+  }
+  regenerateBoard();
+  refresh();
+  setFeedback('');
+});
+
+shuffleButton.addEventListener('click', () => {
+  regenerateBoard();
+  refresh();
+  setFeedback('');
 });
 
 copyButton.addEventListener('click', async () => {
   if (!output.value) {
+    setFeedback('Add enough unique entries before copying markdown.');
     return;
   }
 
   try {
     await navigator.clipboard.writeText(output.value);
-    copyButton.textContent = 'Copied!';
-    setTimeout(() => {
-      copyButton.textContent = 'Copy Markdown';
-    }, 1200);
+    setFeedback('Markdown copied to clipboard.');
   } catch {
-    setError('Could not copy to clipboard in this browser context.');
+    setFeedback('Could not copy to clipboard in this browser context.');
   }
 });
+
+regenerateBoard();
+refresh();

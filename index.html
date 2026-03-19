@@ -8,75 +8,110 @@
   </head>
   <body>
     <main class="container">
-      <h1>Markdown Bingo Generator</h1>
-      <p class="subtitle">Generate a markdown bingo card from your own entries.</p>
-
-      <form id="bingo-form" novalidate>
-        <label for="title">Card title</label>
-        <input id="title" name="title" type="text" placeholder="My Bingo Card" />
-
-        <div class="grid two-cols">
-          <div>
-            <label for="rows">Rows</label>
-            <input id="rows" name="rows" type="number" min="1" max="15" value="5" />
-          </div>
-          <div>
-            <label for="cols">Columns</label>
-            <input id="cols" name="cols" type="number" min="1" max="15" value="5" />
-          </div>
+      <header class="site-header">
+        <div class="hero">
+          <h1>Markdown Bingo Generator</h1>
+          <p class="subtitle">
+            Compose a bingo card like a developer tool: source entries on the left, inspect the
+            live board in the center, and copy clean markdown from the output pane.
+          </p>
         </div>
+      </header>
 
-        <label for="columnLabels">Column labels</label>
-        <input id="columnLabels" name="columnLabels" type="text" value="BINGO" />
-        <p class="help">Use a single word (e.g. BINGO) or comma-separated labels (e.g. Team,Focus,Learn,Ship,Win).</p>
-
-        <fieldset>
-          <legend>Free space</legend>
-          <label class="inline">
-            <input id="includeFreeSpace" name="includeFreeSpace" type="checkbox" checked />
-            Include free space
-          </label>
-
-          <label for="freeSpacePosition">Position</label>
-          <select id="freeSpacePosition" name="freeSpacePosition">
-            <option value="center" selected>Center</option>
-            <option value="top-left">Top left</option>
-            <option value="top-right">Top right</option>
-            <option value="bottom-left">Bottom left</option>
-            <option value="bottom-right">Bottom right</option>
-            <option value="custom">Custom</option>
-          </select>
-
-          <div class="grid two-cols" id="customPositionFields" hidden>
+      <div class="workspace">
+        <section class="panel input-panel" aria-labelledby="input-heading">
+          <div class="panel-heading">
             <div>
-              <label for="freeSpaceRow">Free space row (1-based)</label>
-              <input id="freeSpaceRow" name="freeSpaceRow" type="number" min="1" value="3" />
-            </div>
-            <div>
-              <label for="freeSpaceCol">Free space col (1-based)</label>
-              <input id="freeSpaceCol" name="freeSpaceCol" type="number" min="1" value="3" />
+              <p class="panel-kicker">Input</p>
+              <h2 id="input-heading">Source Entries</h2>
             </div>
           </div>
-        </fieldset>
 
-        <label for="entries">Possible cell contents</label>
-        <textarea
-          id="entries"
-          name="entries"
-          rows="10"
-          placeholder="One entry per line or comma-separated"
-        ></textarea>
+          <p class="panel-copy">
+            Add one entry per line or use commas. Duplicates are removed before the board is
+            shuffled.
+          </p>
 
-        <button type="submit">Generate</button>
-      </form>
+          <div class="stats" aria-label="Card status">
+            <article class="stat-card">
+              <span class="stat-label">Size</span>
+              <strong id="dimensionStatus">5 rows x 5 columns</strong>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Entries</span>
+              <strong id="entryStatus">0 of 24 unique entries</strong>
+            </article>
+          </div>
 
-      <p id="error" class="error" role="alert"></p>
+          <label for="entries">Possible cell contents</label>
+          <textarea
+            id="entries"
+            name="entries"
+            rows="12"
+            placeholder="One entry per line or comma-separated"
+          ></textarea>
+          <p class="help">The preview fills missing slots with placeholders until enough entries exist.</p>
+        </section>
 
-      <section>
-        <h2>Markdown Output</h2>
-        <textarea id="output" rows="12" readonly></textarea>
-        <button id="copyButton" type="button">Copy Markdown</button>
-      </section>
+        <section class="panel board-panel" aria-labelledby="creator-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Board</p>
+              <h2 id="creator-heading">Live Card</h2>
+            </div>
+          </div>
+
+          <p class="panel-copy">Edit headers inline, click any square to assign the free space, and reshuffle as needed.</p>
+
+          <input
+            id="title"
+            name="title"
+            type="text"
+            class="board-title-input"
+            placeholder="My Bingo Card"
+            aria-label="Card title"
+          />
+
+          <div class="board-shell">
+            <div id="boardEditor" class="board-editor" aria-label="Bingo card editor"></div>
+          </div>
+
+          <div class="control-groups" aria-label="Grid controls">
+            <div class="button-row">
+              <button id="addRowButton" type="button">Add Row</button>
+              <button id="removeRowButton" type="button" class="secondary">Remove Row</button>
+            </div>
+            <div class="button-row">
+              <button id="addColumnButton" type="button">Add Column</button>
+              <button id="removeColumnButton" type="button" class="secondary">Remove Column</button>
+            </div>
+            <div class="button-row">
+              <button id="shuffleButton" type="button">Shuffle Card</button>
+              <button id="clearFreeSpaceButton" type="button" class="secondary">Toggle Free Space</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel output-panel" aria-labelledby="output-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="panel-kicker">Output</p>
+              <h2 id="output-heading">Markdown</h2>
+            </div>
+            <button id="copyButton" type="button" class="secondary">Copy Markdown</button>
+          </div>
+
+          <p class="panel-copy">Generated markdown stays aligned with the current preview state and header edits.</p>
+          <textarea
+            id="output"
+            rows="12"
+            readonly
+            placeholder="Add enough unique entries to generate markdown."
+          ></textarea>
+        </section>
+      </div>
+
+      <p id="feedback" class="feedback" role="status" aria-live="polite"></p>
     </main>
 
     <script src="app.js"></script>
